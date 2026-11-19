@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3a3f47">
+<title>Cubicador de hormigón</title>
+<style>
+  :root{
+    --bg:#f2f1ee; --card:#fff; --ink:#1f2328; --muted:#6b7078; --line:#dcdad5;
+    --acc:#e07a1f; --acc-d:#b85f10; --head:#3a3f47; --ok:#2f7d4f; --bad:#b3261e; --blue:#1f6feb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:17px;line-height:1.4;padding-bottom:110px}
+  header{background:var(--head);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:10}
+  header h1{margin:0 0 8px;font-size:19px;font-weight:700}
+  header select{background:#525862;color:#fff;border:0}
+  header button{background:#525862;color:#fff;border:0;font-weight:700;min-width:48px}
+  main{max-width:760px;margin:0 auto;padding:12px}
+  section{background:var(--card);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  h2{font-size:15px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 0 10px}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:#fff;padding:11px 14px;color:var(--ink)}
+  button.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+  button.pri:active{background:var(--acc-d)}
+  button.small{padding:7px 10px;font-size:15px}
+  button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  button:disabled{opacity:.45}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1}
+  label{display:block;font-size:14px;color:var(--muted);margin-bottom:3px}
+  input,select{font:inherit;width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:2px solid var(--acc);border-color:var(--acc)}
+  input.err{border-color:var(--bad);background:#fdf0ef}
+  input.target{outline:2px solid var(--blue);border-color:var(--blue)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:10px}
+  .unit{font-weight:600;color:var(--ink)}
+  .hint{font-size:13px;color:var(--muted);margin-top:6px}
+  .preview{margin-top:12px;padding:12px;border-radius:10px;background:#fff6ee;border:1px dashed var(--acc);display:flex;justify-content:space-between;align-items:center}
+  .preview b{font-size:22px}
+  /* plano */
+  #viewer{display:none;margin-top:10px;border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:60vh;background:#e8e6e1}
+  #wrap{position:relative;width:100%}
+  #wrap img{display:block;width:100%;height:auto;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  #ov{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+  #viewer.measuring{cursor:crosshair}
+  .tools{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+  .mbox{margin-top:8px;padding:10px;border-radius:10px;background:#eef4ff;border:1px solid #c9dafc}
+  .mbox b{font-size:20px}
+  .escala{font-size:14px;margin-top:8px}
+  .escala.no{color:var(--bad)} .escala.si{color:var(--ok)}
+  /* lista */
+  .grp h3{font-size:15px;margin:12px 0 6px;display:flex;justify-content:space-between;color:var(--head)}
+  .item{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:10px 0;border-top:1px solid var(--line)}
+  .item>.grow{flex:1 1 100%}
+  .item .vol{flex:1}
+  .item .nm{font-weight:700}
+  .item .dt{font-size:14px;color:var(--muted)}
+  .item .vol{font-weight:700;white-space:nowrap;text-align:left;font-size:18px}
+  .item .acts{display:flex;gap:4px}
+  .empty{color:var(--muted);text-align:center;padding:14px 0}
+  table{width:100%;border-collapse:collapse;font-size:16px}
+  td,th{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left}
+  td.n{text-align:right;font-variant-numeric:tabular-nums}
+  tr.tot td{font-weight:800;font-size:19px;border-bottom:0;border-top:2px solid var(--ink)}
+  .bar{position:fixed;left:0;right:0;bottom:0;background:var(--head);color:#fff;padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;justify-content:space-between;align-items:center;z-index:10}
+  .bar .t{font-size:14px;opacity:.8}
+  .bar .v{font-size:26px;font-weight:800}
+  .toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:20px;font-size:15px;opacity:0;transition:.3s;pointer-events:none;z-index:20;max-width:90vw;text-align:center}
+  .toast.on{opacity:1}
+  .editing{outline:3px solid var(--acc);outline-offset:-3px}
+  .print-only{display:none}
+  @media print{
+    body{background:#fff;padding:0;font-size:12pt}
+    header,.bar,.no-print,#secPlano,#secAdd,#secDatos,.acts,.toast{display:none!important}
+    section{box-shadow:none;padding:0;margin-bottom:14pt}
+    .print-only{display:block}
+    main{max-width:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏗️ Cubicador de hormigón</h1>
+  <div class="row">
+    <select id="obraSel" class="grow" aria-label="Obra"></select>
+    <button onclick="nuevaObra()" title="Nueva obra">＋</button>
+  </div>
+</header>
+
+<main>
+  <div class="print-only">
+    <h1 id="pTitle" style="margin:0 0 4pt"></h1>
+    <div id="pDate" style="color:#555;margin-bottom:12pt"></div>
+  </div>
+
+  <!-- ============ PLANO ============ -->
+  <section id="secPlano">
+    <h2>Plano</h2>
+    <button class="pri" style="width:100%" onclick="$('foto').click()" id="btnFoto">📷 Hacer / elegir foto del plano</button>
+    <input id="foto" type="file" accept="image/*" style="display:none">
+
+    <div id="viewer"><div id="wrap"><img id="planoImg" alt="Plano"><svg id="ov" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
+    <div id="planoTools" style="display:none">
+      <div class="row" style="margin-top:8px">
+        <button class="small" onclick="zoom(-1)">➖</button>
+        <button class="small" onclick="zoom(1)">➕</button>
+        <button class="small grow" onclick="toggleViewer()" id="btnHide">Ocultar plano</button>
+        <button class="small" onclick="quitarFoto()">Quitar foto</button>
+      </div>
+      <div id="escalaInfo" class="escala"></div>
+      <div class="tools">
+        <button class="small" data-m="cal" onclick="setModo('cal')">📏 Escala</button>
+        <button class="small" data-m="len" onclick="setModo('len')">↔️ Longitud</button>
+        <button class="small" data-m="area" onclick="setModo('area')">⬠ Área</button>
+      </div>
+      <div id="mStatus" class="hint"></div>
+      <div id="calRow" class="mbox" style="display:none">
+        <label for="calVal">¿Cuánto mide de verdad esa cota? <span class="unit">(m)</span></label>
+        <div class="row"><input id="calVal" class="grow" inputmode="decimal" style="width:auto"><button class="pri" onclick="fijarEscala()">Fijar</button></div>
+      </div>
+      <div id="mRes" class="mbox" style="display:none">
+        <div class="row"><span class="grow" id="mLabel">Medida</span><b id="mVal"></b></div>
+        <div class="row" style="margin-top:8px">
+          <button class="small grow pri" onclick="usarMedida(false)" id="btnPut">Poner en casilla</button>
+          <button class="small" onclick="usarMedida(true)">＋ Sumar</button>
+        </div>
+      </div>
+      <div class="row" id="mActs" style="margin-top:8px;display:none">
+        <button class="small grow" onclick="deshacerPunto()">↶ Deshacer punto</button>
+        <button class="small grow" onclick="terminar()">✓ Terminar</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ AÑADIR ============ -->
+  <section id="secAdd">
+    <h2 id="addTitle">Añadir elemento</h2>
+    <div class="row">
+      <div class="grow" style="min-width:210px">
+        <label for="tipo">Tipo</label>
+        <select id="tipo"></select>
+      </div>
+      <div style="width:140px">
+        <label for="ref">Referencia</label>
+        <input id="ref" placeholder="Pila 1, Aleta E1…">
+      </div>
+    </div>
+    <div class="grid" id="campos"></div>
+    <div class="hint">Medidas en metros. Puede escribir operaciones: <b>12,5 + 3,2</b> o <b>8*4 − 2*1,5</b>.</div>
+    <div class="preview"><span>Volumen</span><b id="prev">0,000 m³</b></div>
+    <div class="row" style="margin-top:12px">
+      <button class="pri grow" id="btnAdd" onclick="guardar()">➕ Añadir</button>
+      <button id="btnCancel" style="display:none" onclick="cancelarEdicion()">Cancelar</button>
+    </div>
+  </section>
+
+  <!-- ============ LISTA ============ -->
+  <section>
+    <h2>Elementos</h2>
+    <div id="lista"></div>
+  </section>
+
+  <!-- ============ RESUMEN ============ -->
+  <section>
+    <h2>Resumen</h2>
+    <div id="resumen"></div>
+    <div class="row no-print" style="margin-top:14px">
+      <button class="grow" onclick="whatsapp()">💬 WhatsApp</button>
+      <button class="grow" onclick="pdf()">📄 PDF</button>
+      <button class="grow" onclick="copiar()">📋 Copiar</button>
+    </div>
+  </section>
+
+  <!-- ============ DATOS ============ -->
+  <section id="secDatos">
+    <h2>Excel y copias</h2>
+    <div class="row">
+      <button class="grow" onclick="exportarExcel()">📊 Exportar a Excel</button>
+      <button class="grow" onclick="$('imp').click()">📥 Importar</button>
+    </div>
+    <input id="imp" type="file" accept=".xlsx,.xls,.csv,.json,application/json,text/csv" style="display:none">
+    <div class="hint">Importar admite un Excel (o CSV) con elementos, que se añaden a esta obra, o una copia de seguridad (.json).</div>
+    <div class="row" style="margin-top:10px">
+      <button class="grow" onclick="plantilla()">📄 Plantilla Excel vacía</button>
+      <button class="grow" onclick="copiaSeguridad()">💾 Copia de seguridad</button>
+    </div>
+    <h2 style="margin-top:18px">Obra</h2>
+    <div class="row">
+      <button class="grow small" onclick="renombrarObra()">✏️ Renombrar</button>
+      <button class="grow small" onclick="duplicarObra()">⧉ Duplicar</button>
+      <button class="grow small" style="color:var(--bad)" onclick="borrarObra()">🗑️ Borrar obra</button>
+    </div>
+  </section>
+</main>
+
+<div class="bar">
+  <div><div class="t" id="barObra">Total hormigón</div><div class="v" id="barTot">0,00 m³</div></div>
+  <div class="t" id="barN">0 elementos</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" async></script>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const fmt=(n,d=3)=>(isFinite(n)?n:0).toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtIn=n=>(Math.round(n*1000)/1000).toString().replace('.',',');
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=s=>String(s??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const PI=Math.PI;
+
+/* =================== TIPOS DE ELEMENTO (todo en metros) =================== */
+const F=(k,l,u='m',d='')=>({k,l,u,d});
+const LAC=()=>[F('l','Largo'),F('a','Ancho'),F('c','Canto')];
+const LAE=()=>[F('l','Largo'),F('a','Ancho'),F('e','Espesor')];
+const TIPOS={
+  zap :{g:'Cimentaciones',   l:'Zapata',                         f:LAC(), c:v=>v.l*v.a*v.c},
+  enc :{g:'Cimentaciones',   l:'Encepado',                       f:LAC(), c:v=>v.l*v.a*v.c},
+  pil :{g:'Cimentaciones',   l:'Pilote',                         f:[F('d','Diámetro'),F('h','Longitud')], c:v=>PI*v.d*v.d/4*v.h},
+  losc:{g:'Cimentaciones',   l:'Losa de cimentación / solera',   f:LAE(), c:v=>v.l*v.a*v.e},
+  limp:{g:'Cimentaciones',   l:'Hormigón de limpieza',           f:[F('s','Superficie','m²'),F('e','Espesor','m','0,10')], c:v=>v.s*v.e},
+  fr  :{g:'Fustes',          l:'Fuste rectangular',              f:[F('a','Lado A'),F('b','Lado B'),F('h','Altura')], c:v=>v.a*v.b*v.h},
+  fc  :{g:'Fustes',          l:'Fuste circular',                 f:[F('d','Diámetro'),F('h','Altura')], c:v=>PI*v.d*v.d/4*v.h},
+  fo  :{g:'Fustes',          l:'Fuste con extremos redondeados', f:[F('L','Largo total'),F('a','Ancho'),F('h','Altura')], c:v=>((v.L-v.a)*v.a+PI*v.a*v.a/4)*v.h, hint:'Los extremos son semicírculos de diámetro igual al ancho.'},
+  fs  :{g:'Fustes',          l:'Fuste por área de sección',      f:[F('s','Área sección','m²'),F('h','Altura')], c:v=>v.s*v.h, hint:'Para secciones raras: mida el área sobre la foto de la sección.'},
+  din :{g:'Fustes',          l:'Dintel / cargadero',             f:LAC(), c:v=>v.l*v.a*v.c},
+  tl  :{g:'Tableros',        l:'Tablero losa maciza',            f:[F('l','Longitud'),F('a','Ancho'),F('c','Canto')], c:v=>v.l*v.a*v.c},
+  ta  :{g:'Tableros',        l:'Tablero losa aligerada',         f:[F('l','Longitud'),F('a','Ancho'),F('c','Canto'),F('n','Nº aligeramientos','uds'),F('d','Diámetro aligeramiento')], c:v=>v.l*(v.a*v.c-v.n*PI*v.d*v.d/4), hint:'Los macizos sobre apoyos, añádalos aparte como losa maciza.'},
+  ts  :{g:'Tableros',        l:'Tablero por área de sección',    f:[F('s','Área sección','m²'),F('l','Longitud')], c:v=>v.s*v.l, hint:'Para cajones o vigas: área de la sección (mídala sobre la foto) × longitud.'},
+  rio :{g:'Tableros',        l:'Riostra / traviesa',             f:LAC(), c:v=>v.l*v.a*v.c},
+  imp :{g:'Tableros',        l:'Imposta',                        f:[F('s','Área sección','m²'),F('l','Longitud')], c:v=>v.s*v.l},
+  ls  :{g:'Losas superiores',l:'Losa superior',                  f:LAE(), c:v=>v.l*v.a*v.e},
+  lss :{g:'Losas superiores',l:'Losa superior por superficie',   f:[F('s','Superficie','m²'),F('e','Espesor')], c:v=>v.s*v.e},
+  lt  :{g:'Losas superiores',l:'Losa de transición',             f:LAE(), c:v=>v.l*v.a*v.e},
+  at  :{g:'Aletas y muros',  l:'Aleta (altura variable)',        f:[F('l','Largo'),F('h1','Altura inicio'),F('h2','Altura final'),F('e','Espesor')], c:v=>v.l*(v.h1+v.h2)/2*v.e},
+  atv :{g:'Aletas y muros',  l:'Aleta (altura y espesor variables)', f:[F('l','Largo'),F('h1','Altura inicio'),F('h2','Altura final'),F('ec','Espesor coronación'),F('eb','Espesor base')], c:v=>v.l*(v.h1+v.h2)/2*(v.ec+v.eb)/2, hint:'Aproximado: usa el espesor medio. Para más precisión, use "Muro por área de sección" por tramos.'},
+  mu  :{g:'Aletas y muros',  l:'Muro / hastial / estribo',       f:[F('l','Largo'),F('h','Altura'),F('e','Espesor')], c:v=>v.l*v.h*v.e},
+  ms  :{g:'Aletas y muros',  l:'Muro por área de sección',       f:[F('s','Área sección','m²'),F('l','Largo')], c:v=>v.s*v.l},
+  otro:{g:'Otros',           l:'Otro (volumen directo)',         f:[F('v','Volumen','m³')], c:v=>v.v}
+};
+const GRUPOS=['Cimentaciones','Fustes','Tableros','Losas superiores','Aletas y muros','Otros'];
+const MAXM=5; // nº máximo de medidas por elemento (columnas M1..M5 del Excel)
+
+/* Evalúa un número o una operación sencilla: "12*8+3,5*4" */
+function num(txt){
+  if(typeof txt==='number') return txt;
+  if(txt==null) return NaN;
+  let t=String(txt).trim().replace(/,/g,'.').replace(/[x×]/gi,'*').replace(/[−–]/g,'-');
+  if(t==='') return NaN;
+  if(!/^[0-9+\-*/().\s]+$/.test(t)) return NaN;
+  try{ const r=Function('"use strict";return ('+t+')')(); return (typeof r==='number'&&isFinite(r))?r:NaN; }catch(e){ return NaN; }
+}
+function calcItem(it){
+  const t=TIPOS[it.tipo]; if(!t) return NaN;
+  const v={}; for(const f of t.f){ v[f.k]=num(it.raw[f.k]); if(isNaN(v[f.k])) return NaN; }
+  const r=t.c(v)*(num(it.uds)||0);
+  return isFinite(r)?r:NaN;
+}
+
+/* =================== ALMACENAMIENTO =================== */
+const KEY='cubicador_v2';
+let db=null;
+try{ const d=JSON.parse(localStorage.getItem(KEY)); if(d&&d.obras) db=d; }catch(e){}
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(db)); }catch(e){ toast('No se ha podido guardar en el móvil'); } }
+const obra=()=>db.obras[db.current];
+const obrasOrdenadas=()=>Object.values(db.obras).sort((a,b)=>a.creada-b.creada);
+
+/* Imágenes en IndexedDB (caben muchas más que en localStorage) */
+let idbP=null;
+function idb(){ if(!idbP) idbP=new Promise((res,rej)=>{ const r=indexedDB.open('cubicador',1); r.onupgradeneeded=()=>r.result.createObjectStore('img'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); return idbP; }
+async function imgGet(id){ try{ const d=await idb(); return await new Promise(res=>{ const q=d.transaction('img').objectStore('img').get(id); q.onsuccess=()=>res(q.result||null); q.onerror=()=>res(null); }); }catch(e){ return null; } }
+async function imgSet(id,val){ try{ const d=await idb(); await new Promise(res=>{ const tx=d.transaction('img','readwrite'); const s=tx.objectStore('img'); val?s.put(val,id):s.delete(id); tx.oncomplete=res; tx.onerror=res; }); }catch(e){ toast('No se ha podido guardar la foto'); } }
+
+function crearObra(nombre){ const o={id:uid(),nombre,items:[],escala:null,creada:Date.now()}; db.obras[o.id]=o; return o; }
+
+async function initDB(){
+  if(!db){
+    db={current:null,obras:{}};
+    // Migrar datos de la versión anterior, si los hay
+    try{
+      const old=JSON.parse(localStorage.getItem('cubicador_v1'));
+      if(old&&Array.isArray(old.items)&&old.items.length){
+        const o=crearObra(old.obra||'Obra anterior');
+        o.items=old.items.map(it=>({id:uid(),tipo:'otro',ref:(it.nombre||'Elemento')+' (versión anterior)',raw:{v:fmtIn(it.vol||0)},uds:'1'}));
+        const img=localStorage.getItem('cubicador_img_v1'); if(img) await imgSet(o.id,img);
+        db.current=o.id;
+      }
+    }catch(e){}
+    if(!Object.keys(db.obras).length) db.current=crearObra('Obra 1').id;
+    save();
+  }
+  if(!db.obras[db.current]) db.current=obrasOrdenadas()[0].id;
+}
+
+/* =================== OBRAS =================== */
+$('obraSel').onchange=e=>cambiarObra(e.target.value);
+function cambiarObra(id){ db.current=id; save(); cancelarEdicion(); terminar(); cargarFoto(); render(); }
+function nuevaObra(){
+  const n=prompt('Nombre de la nueva obra:', 'Obra '+(Object.keys(db.obras).length+1));
+  if(n===null) return; const o=crearObra(n.trim()||'Obra sin nombre'); cambiarObra(o.id); toast('Obra creada');
+}
+function renombrarObra(){ const n=prompt('Nuevo nombre:',obra().nombre); if(n===null||!n.trim()) return; obra().nombre=n.trim(); save(); render(); }
+async function duplicarObra(){
+  const src=obra(), o=crearObra(src.nombre+' (copia)');
+  o.items=src.items.map(it=>({...it,id:uid(),raw:{...it.raw}})); o.escala=src.escala?{...src.escala}:null;
+  const img=await imgGet(src.id); if(img) await imgSet(o.id,img);
+  cambiarObra(o.id); toast('Obra duplicada');
+}
+async function borrarObra(){
+  const o=obra();
+  if(!confirm('¿Borrar la obra "'+o.nombre+'" con sus '+o.items.length+' elementos? No se puede deshacer.')) return;
+  delete db.obras[o.id]; await imgSet(o.id,null);
+  if(!Object.keys(db.obras).length) crearObra('Obra 1');
+  cambiarObra(obrasOrdenadas()[0].id);
+}
+
+/* =================== FORMULARIO =================== */
+let editId=null, lastInput=null;
+function initTipos(){
+  const sel=$('tipo');
+  GRUPOS.forEach(g=>{
+    const og=document.createElement('optgroup'); og.label=g;
+    Object.entries(TIPOS).filter(([,t])=>t.g===g).forEach(([k,t])=>{ const o=document.createElement('option'); o.value=k; o.textContent=t.l; og.appendChild(o); });
+    sel.appendChild(og);
+  });
+  sel.onchange=()=>pintarCampos();
+}
+function pintarCampos(vals,uds){
+  const t=TIPOS[$('tipo').value], c=$('campos');
+  c.innerHTML=t.f.map(f=>`<div><label>${f.l} <span class="unit">(${f.u})</span></label>
+     <input inputmode="decimal" data-k="${f.k}" data-l="${esc(f.l)}" value="${esc(vals&&vals[f.k]!=null?vals[f.k]:f.d)}"></div>`).join('')+
+    `<div><label>Unidades <span class="unit">(uds)</span></label><input inputmode="numeric" data-k="_n" data-l="Unidades" value="${esc(uds||'1')}"></div>`+
+    (t.hint?`<div class="hint" style="grid-column:1/-1;margin:0">${t.hint}</div>`:'');
+  c.querySelectorAll('input').forEach(i=>{ i.oninput=preview; i.onfocus=()=>marcarDestino(i); });
+  marcarDestino(null); preview();
+}
+function marcarDestino(i){
+  if(lastInput) lastInput.classList.remove('target');
+  lastInput=i; if(i) i.classList.add('target');
+  $('btnPut').textContent = i ? `Poner en «${i.dataset.l}»` : 'Poner en casilla';
+}
+function leerForm(){
+  const raw={}; let uds='1';
+  $('campos').querySelectorAll('input').forEach(i=>{ if(i.dataset.k==='_n') uds=i.value.trim(); else raw[i.dataset.k]=i.value.trim(); });
+  const it={tipo:$('tipo').value,raw,uds};
+  $('campos').querySelectorAll('input').forEach(i=>{ const n=num(i.value); i.classList.toggle('err',i.value.trim()!==''&&(isNaN(n)||n<0)); });
+  const vol=calcItem(it);
+  return {it, ok:!isNaN(vol)&&vol>=0&&num(uds)>0, vol};
+}
+function preview(){ const r=leerForm(); $('prev').textContent=fmt(r.ok?r.vol:0)+' m³'; }
+function guardar(){
+  const r=leerForm();
+  if(!r.ok){ toast('Revise las medidas: falta algún dato o hay un error'); return; }
+  const item={...r.it,id:editId||uid(),ref:$('ref').value.trim()};
+  const o=obra();
+  if(editId){ o.items=o.items.map(x=>x.id===editId?item:x); toast('Elemento actualizado'); }
+  else { o.items.push(item); toast('Añadido: '+fmt(r.vol)+' m³'); }
+  save(); cancelarEdicion(); render();
+}
+function editar(id){
+  const it=obra().items.find(x=>x.id===id); if(!it) return;
+  editId=id; $('tipo').value=it.tipo; $('ref').value=it.ref||''; pintarCampos(it.raw,it.uds);
+  $('addTitle').textContent='Editar elemento'; $('btnAdd').textContent='💾 Guardar cambios';
+  $('btnCancel').style.display=''; $('secAdd').classList.add('editing');
+  $('secAdd').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function cancelarEdicion(){
+  editId=null; $('ref').value='';
+  $('addTitle').textContent='Añadir elemento'; $('btnAdd').textContent='➕ Añadir';
+  $('btnCancel').style.display='none'; $('secAdd').classList.remove('editing'); pintarCampos();
+}
+function duplicar(id){
+  const o=obra(), it=o.items.find(x=>x.id===id); if(!it) return;
+  o.items.splice(o.items.indexOf(it)+1,0,{...it,raw:{...it.raw},id:uid(),ref:it.ref?it.ref+' (copia)':''});
+  save(); render(); toast('Duplicado');
+}
+function borrar(id){
+  const o=obra(), it=o.items.find(x=>x.id===id); if(!it) return;
+  if(!confirm('¿Borrar '+(it.ref||TIPOS[it.tipo].l)+'?')) return;
+  o.items=o.items.filter(x=>x.id!==id); save(); render();
+}
+
+/* =================== LISTA Y RESUMEN =================== */
+function detalle(it){
+  const t=TIPOS[it.tipo];
+  return t.f.map(f=>`${String(it.raw[f.k]??'').replace(/\./g,',')} ${f.u}`).join(' × ')+(num(it.uds)!==1?` · ${it.uds} uds`:'');
+}
+function totales(){
+  const g={}; GRUPOS.forEach(x=>g[x]=0); let tot=0;
+  obra().items.forEach(it=>{ const v=calcItem(it)||0; g[TIPOS[it.tipo].g]+=v; tot+=v; });
+  return {g,tot};
+}
+function render(){
+  $('obraSel').innerHTML=obrasOrdenadas().map(o=>`<option value="${o.id}"${o.id===db.current?' selected':''}>${esc(o.nombre)}</option>`).join('');
+  const o=obra(), L=$('lista');
+  if(!o.items.length) L.innerHTML='<div class="empty">Todavía no hay elementos. Añada el primero arriba.</div>';
+  else L.innerHTML=GRUPOS.map(g=>{
+    const its=o.items.filter(it=>TIPOS[it.tipo].g===g); if(!its.length) return '';
+    const sub=its.reduce((a,b)=>a+(calcItem(b)||0),0);
+    return `<div class="grp"><h3><span>${g}</span><span>${fmt(sub,2)} m³</span></h3>`+its.map(it=>`<div class="item">
+      <div class="grow"><div class="nm">${esc(it.ref||'—')} <span class="dt">· ${TIPOS[it.tipo].l}</span></div><div class="dt">${esc(detalle(it))}</div></div>
+      <div class="vol">${fmt(calcItem(it))} m³</div>
+      <div class="acts"><button class="small" title="Editar" onclick="editar('${it.id}')">✏️</button><button class="small" title="Duplicar" onclick="duplicar('${it.id}')">⧉</button><button class="small" title="Borrar" onclick="borrar('${it.id}')">🗑️</button></div></div>`).join('')+'</div>';
+  }).join('');
+  const {g,tot}=totales();
+  $('resumen').innerHTML=o.items.length
+    ? `<table>${GRUPOS.filter(x=>g[x]>0).map(x=>`<tr><td>${x}</td><td class="n">${fmt(g[x],2)} m³</td></tr>`).join('')}<tr class="tot"><td>TOTAL</td><td class="n">${fmt(tot,2)} m³</td></tr></table>`
+    : '<div class="empty">—</div>';
+  $('barObra').textContent=o.nombre; $('barTot').textContent=fmt(tot,2)+' m³';
+  $('barN').textContent=o.items.length+(o.items.length===1?' elemento':' elementos');
+  pintarEscala();
+}
+
+/* =================== COMPARTIR =================== */
+function texto(){
+  const o=obra(), {g,tot}=totales();
+  let s=`*Cubicación de hormigón*\nObra: ${o.nombre}\nFecha: ${new Date().toLocaleDateString('es-ES')}\n`;
+  GRUPOS.forEach(gr=>{
+    const its=o.items.filter(it=>TIPOS[it.tipo].g===gr); if(!its.length) return;
+    s+=`\n*${gr}* — ${fmt(g[gr],2)} m³\n`;
+    its.forEach(it=>{ s+=`• ${it.ref||TIPOS[it.tipo].l}: ${detalle(it)} = ${fmt(calcItem(it))} m³\n`; });
+  });
+  return s+`\n*TOTAL: ${fmt(tot,2)} m³*`;
+}
+const hayItems=()=>{ if(!obra().items.length){ toast('No hay elementos'); return false; } return true; };
+function whatsapp(){ if(hayItems()) window.open('https://wa.me/?text='+encodeURIComponent(texto()),'_blank'); }
+function copiar(){
+  if(!hayItems()) return; const t=texto();
+  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Copiado')).catch(()=>{
+    const a=document.createElement('textarea'); a.value=t; document.body.appendChild(a); a.select(); try{document.execCommand('copy');toast('Copiado');}catch(e){} a.remove(); });
+}
+function pdf(){
+  if(!hayItems()) return;
+  $('pTitle').textContent='Cubicación de hormigón — '+obra().nombre;
+  $('pDate').textContent='Fecha: '+new Date().toLocaleDateString('es-ES');
+  window.print();
+}
+
+/* =================== FOTO Y MEDICIÓN =================== */
+const img=$('planoImg'), ov=$('ov'), viewer=$('viewer'), wrap=$('wrap');
+let zoomLvl=1, M={modo:null,pts:[]}, medida=null;
+
+$('foto').onchange=e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ const im=new Image(); im.onload=async()=>{
+    const max=2400, k=Math.min(1,max/Math.max(im.width,im.height));
+    const cv=document.createElement('canvas'); cv.width=Math.round(im.width*k); cv.height=Math.round(im.height*k);
+    cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+    const url=cv.toDataURL('image/jpeg',0.85);
+    const o=obra(); if(o.escala){ o.escala=null; save(); toast('Foto nueva: vuelva a fijar la escala'); }
+    await imgSet(o.id,url); mostrarFoto(url);
+  }; im.src=rd.result; };
+  rd.readAsDataURL(f);
+};
+async function cargarFoto(){
+  const id=db.current, url=await imgGet(id);
+  if(id!==db.current) return;
+  if(url) mostrarFoto(url); else ocultarFoto();
+}
+function mostrarFoto(url){
+  img.src=url; viewer.style.display='block'; $('planoTools').style.display='block';
+  $('btnFoto').textContent='📷 Cambiar foto del plano'; $('btnHide').textContent='Ocultar plano';
+  zoomLvl=1; wrap.style.width='100%'; terminar(); pintarEscala();
+}
+function ocultarFoto(){
+  img.removeAttribute('src'); viewer.style.display='none'; $('planoTools').style.display='none';
+  $('btnFoto').textContent='📷 Hacer / elegir foto del plano'; terminar();
+}
+async function quitarFoto(){
+  if(!confirm('¿Quitar la foto del plano de esta obra?')) return;
+  const o=obra(); o.escala=null; save(); await imgSet(o.id,null); ocultarFoto();
+}
+function zoom(d){
+  const cx=(viewer.scrollLeft+viewer.clientWidth/2)/wrap.clientWidth, cy=(viewer.scrollTop+viewer.clientHeight/2)/wrap.clientHeight;
+  zoomLvl=Math.max(1,Math.min(8,zoomLvl*(d>0?1.5:1/1.5)));
+  wrap.style.width=(zoomLvl*100)+'%';
+  viewer.scrollLeft=cx*wrap.clientWidth-viewer.clientWidth/2; viewer.scrollTop=cy*wrap.clientHeight-viewer.clientHeight/2;
+  dibujar();
+}
+function toggleViewer(){ const on=viewer.style.display!=='none'; viewer.style.display=on?'none':'block'; $('btnHide').textContent=on?'Mostrar plano':'Ocultar plano'; }
+
+function pintarEscala(){
+  const e=obra().escala, el=$('escalaInfo');
+  if(e){ el.className='escala si'; el.textContent=`✔ Escala fijada con una cota de ${fmt(e.ref,2)} m`; }
+  else { el.className='escala no'; el.textContent='Escala sin fijar: pulse 📏 Escala y marque una cota conocida antes de medir.'; }
+}
+const AYUDA={
+  cal:'Toque los dos extremos de una cota conocida. Cuanto más larga, más precisa la medición.',
+  len:'Toque dos puntos. Para medir otra, siga tocando.',
+  area:'Toque las esquinas del contorno en orden. El área aparece desde el tercer punto.'
+};
+function setModo(m){
+  if(m!=='cal'&&!obra().escala){ toast('Primero fije la escala con una cota conocida'); m='cal'; }
+  if(M.modo===m){ terminar(); return; }
+  M={modo:m,pts:[]}; medida=null;
+  document.querySelectorAll('.tools button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  viewer.style.display='block'; viewer.classList.add('measuring'); $('btnHide').textContent='Ocultar plano';
+  $('mStatus').textContent=AYUDA[m]; $('mActs').style.display='flex';
+  $('calRow').style.display='none'; $('mRes').style.display='none'; dibujar();
+}
+function terminar(){
+  M={modo:null,pts:[]};
+  document.querySelectorAll('.tools button').forEach(b=>b.classList.remove('on'));
+  viewer.classList.remove('measuring'); $('mStatus').textContent=''; $('mActs').style.display='none'; $('calRow').style.display='none';
+  dibujar(); // la última medida (si la hay) sigue disponible en el recuadro azul
+}
+function deshacerPunto(){ M.pts.pop(); actualizarMedida(); dibujar(); }
+
+wrap.addEventListener('click',e=>{
+  if(!M.modo||!img.naturalWidth) return;
+  const r=img.getBoundingClientRect();
+  const p={x:(e.clientX-r.left)/r.width*img.naturalWidth, y:(e.clientY-r.top)/r.height*img.naturalHeight};
+  if(M.modo==='cal'&&M.pts.length>=2) M.pts=[];
+  if(M.modo==='len'&&M.pts.length>=2) M.pts=[];
+  M.pts.push(p); actualizarMedida(); dibujar();
+});
+const distPx=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function areaPx(p){ let s=0; for(let i=0;i<p.length;i++){ const a=p[i],b=p[(i+1)%p.length]; s+=a.x*b.y-b.x*a.y; } return Math.abs(s)/2; }
+function actualizarMedida(){
+  const p=M.pts, e=obra().escala;
+  if(M.modo==='cal'){
+    $('calRow').style.display=p.length===2?'block':'none';
+    $('mStatus').textContent=p.length===2?'Escriba cuánto mide esa cota en el plano:':AYUDA.cal;
+    if(p.length===2) setTimeout(()=>$('calVal').focus(),50);
+    return;
+  }
+  if(M.modo==='len'&&p.length===2&&e){ medida={tipo:'len',v:distPx(p[0],p[1])*e.mpp}; }
+  else if(M.modo==='area'&&p.length>=3&&e){ medida={tipo:'area',v:areaPx(p)*e.mpp*e.mpp}; }
+  else if(M.modo) { $('mRes').style.display=medida?'block':'none'; return; }
+  $('mLabel').textContent=medida.tipo==='len'?'Longitud':'Área ('+p.length+' puntos)';
+  $('mVal').textContent=medida.tipo==='len'?fmt(medida.v)+' m':fmt(medida.v)+' m²';
+  $('mRes').style.display='block';
+}
+function fijarEscala(){
+  const v=num($('calVal').value);
+  if(!(v>0)||M.pts.length<2){ toast('Escriba la medida real en metros'); return; }
+  const px=distPx(M.pts[0],M.pts[1]); if(px<5){ toast('Los puntos están demasiado juntos'); return; }
+  obra().escala={mpp:v/px,ref:v}; save(); $('calVal').value='';
+  pintarEscala(); toast('Escala fijada. Ya puede medir.'); setModo('len');
+}
+function usarMedida(sumar){
+  if(!medida){ toast('Primero haga una medida'); return; }
+  if(!lastInput||!document.body.contains(lastInput)){ toast('Toque antes la casilla del formulario donde va el dato'); return; }
+  const val=fmtIn(medida.v), cur=lastInput.value.trim();
+  lastInput.value = (sumar&&cur) ? cur+' + '+val : val;
+  preview(); toast((sumar?'Sumado a «':'Puesto en «')+lastInput.dataset.l+'»');
+}
+function dibujar(){
+  if(!img.naturalWidth){ ov.innerHTML=''; return; }
+  const W=img.naturalWidth,H=img.naturalHeight, s=W/(img.clientWidth||W), p=M.pts;
+  ov.setAttribute('viewBox',`0 0 ${W} ${H}`); ov.setAttribute('preserveAspectRatio','none');
+  const col=M.modo==='cal'?'#1f6feb':M.modo==='area'?'#2f7d4f':'#e07a1f', r=7*s, sw=3*s;
+  let h='';
+  if(p.length>1){
+    const pts=p.map(q=>q.x+','+q.y).join(' ');
+    h+= M.modo==='area'&&p.length>2
+      ? `<polygon points="${pts}" fill="${col}" fill-opacity=".2" stroke="${col}" stroke-width="${sw}"/>`
+      : `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="${sw}"/>`;
+  }
+  p.forEach(q=>{ h+=`<circle cx="${q.x}" cy="${q.y}" r="${r}" fill="#fff" stroke="${col}" stroke-width="${sw}"/>`; });
+  ov.innerHTML=h;
+}
+img.addEventListener('load',dibujar); window.addEventListener('resize',dibujar);
+
+/* =================== EXCEL: EXPORTAR / IMPORTAR =================== */
+const CAB=['Grupo','Tipo','Referencia','Uds','M1','M2','M3','M4','M5','Medidas','Volumen (m³)'];
+function filasTipos(){
+  return [['Tipo','Grupo','M1','M2','M3','M4','M5']].concat(Object.values(TIPOS).map(t=>{
+    const r=[t.l,t.g]; for(let i=0;i<MAXM;i++) r.push(t.f[i]?`${t.f[i].l} (${t.f[i].u})`:''); return r; }));
+}
+function nombreArchivo(s){ return String(s).replace(/[\\/:*?"<>|]+/g,'').trim()||'obra'; }
+function descargar(blob,nombre){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nombre;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
+}
+function aCSV(aoa){
+  const c=v=>{ let s=typeof v==='number'?String(v).replace('.',','):String(v??''); return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  return '﻿'+aoa.map(r=>r.map(c).join(';')).join('\r\n');
+}
+function libro(hojas,nombre){
+  if(window.XLSX){
+    const wb=XLSX.utils.book_new();
+    hojas.forEach(([n,aoa,cols])=>{ const ws=XLSX.utils.aoa_to_sheet(aoa); if(cols) ws['!cols']=cols.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb,ws,n); });
+    XLSX.writeFile(wb,nombre+'.xlsx');
+  } else {
+    descargar(new Blob([aCSV(hojas[0][1])],{type:'text/csv;charset=utf-8'}),nombre+'.csv');
+    toast('Sin conexión: se ha guardado como CSV (se abre en Excel)');
+  }
+}
+const COLS=[16,30,18,6,9,9,9,9,9,34,13];
+function exportarExcel(){
+  if(!hayItems()) return;
+  const o=obra(), {g,tot}=totales();
+  const filas=[CAB].concat(o.items.map(it=>{
+    const t=TIPOS[it.tipo], r=[t.g,t.l,it.ref||'',num(it.uds)];
+    for(let i=0;i<MAXM;i++){ const f=t.f[i]; r.push(f?num(it.raw[f.k]):''); }
+    r.push(detalle(it), Math.round(calcItem(it)*1000)/1000); return r;
+  }));
+  const res=[['Obra',o.nombre],['Fecha',new Date().toLocaleDateString('es-ES')],[],['Grupo','Volumen (m³)']]
+    .concat(GRUPOS.filter(x=>g[x]>0).map(x=>[x,Math.round(g[x]*100)/100])).concat([['TOTAL',Math.round(tot*100)/100]]);
+  libro([['Elementos',filas,COLS],['Resumen',res,[20,14]],['Tipos',filasTipos(),[34,16,24,24,24,24,24]]],'Cubicación '+nombreArchivo(o.nombre));
+}
+function plantilla(){
+  const ej=[CAB,
+    ['Cimentaciones','Zapata','Zapata pila 1',2,6,4,1.5,'','','','' ],
+    ['Fustes','Fuste circular','Pila 1',2,1.2,8.5,'','','','',''],
+    ['Aletas y muros','Aleta (altura variable)','Aleta E1',1,5,4,1.5,0.5,'','','']];
+  libro([['Elementos',ej,COLS],['Tipos',filasTipos(),[34,16,24,24,24,24,24]]],'Plantilla cubicador');
+  toast('Rellene la hoja "Elementos". La hoja "Tipos" dice qué es cada M1, M2…');
+}
+
+$('imp').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  const ext=(f.name.split('.').pop()||'').toLowerCase();
+  try{
+    if(ext==='json') return await restaurar(JSON.parse(await f.text()));
+    let aoa;
+    if(ext==='csv') aoa=parseCSV(await f.text());
+    else {
+      if(!window.XLSX){ toast('Para leer Excel hace falta conexión a internet'); return; }
+      const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+      const ws=wb.Sheets['Elementos']||wb.Sheets[wb.SheetNames[0]];
+      aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+    }
+    importarFilas(aoa);
+  }catch(err){ console.error(err); toast('No se ha podido leer el archivo'); }
+};
+function parseCSV(txt){
+  txt=txt.replace(/^﻿/,'');
+  const sep=(txt.split('\n')[0].match(/;/g)||[]).length>=(txt.split('\n')[0].match(/,/g)||[]).length?';':',';
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<txt.length;i++){
+    const ch=txt[i];
+    if(q){ if(ch==='"'){ if(txt[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else if(ch==='"') q=true;
+    else if(ch===sep){ row.push(cur); cur=''; }
+    else if(ch==='\n'){ row.push(cur.replace(/\r$/,'')); rows.push(row); row=[]; cur=''; }
+    else cur+=ch;
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+function tipoDe(v){
+  const n=norm(v); if(!n) return null;
+  if(TIPOS[n]) return n;
+  for(const [k,t] of Object.entries(TIPOS)) if(norm(t.l)===n) return k;
+  return null;
+}
+function importarFilas(aoa){
+  const hi=aoa.findIndex(r=>r.some(c=>norm(c)==='tipo'));
+  if(hi<0){ toast('No encuentro la columna "Tipo". Use la plantilla.'); return; }
+  const H=aoa[hi].map(norm), col=names=>H.findIndex(h=>names.includes(h));
+  const cT=col(['tipo']), cR=col(['referencia','ref','nombre','elemento']), cU=col(['uds','unidades','ud','cantidad']);
+  const cM=[]; for(let i=1;i<=MAXM;i++) cM.push(col(['m'+i,'medida '+i,'medida'+i]));
+  const nuevos=[]; let malas=0;
+  aoa.slice(hi+1).forEach(r=>{
+    if(!r||r.every(c=>String(c??'').trim()==='')) return;
+    const k=tipoDe(r[cT]); if(!k){ malas++; return; }
+    const t=TIPOS[k], raw={};
+    t.f.forEach((f,i)=>{ const v=cM[i]>=0?r[cM[i]]:''; raw[f.k]=typeof v==='number'?fmtIn(v):String(v??'').trim(); });
+    const u=cU>=0?r[cU]:1, uds=(u===''||u==null)?'1':(typeof u==='number'?fmtIn(u):String(u).trim());
+    const it={id:uid(),tipo:k,ref:cR>=0?String(r[cR]??'').trim():'',raw,uds};
+    if(isNaN(calcItem(it))){ malas++; return; }
+    nuevos.push(it);
+  });
+  if(!nuevos.length){ toast('No se ha importado nada'+(malas?` (${malas} filas con errores)`:'')); return; }
+  if(!confirm(`Se van a añadir ${nuevos.length} elementos a la obra "${obra().nombre}".`+(malas?`\n\n${malas} filas no se entienden y se saltarán.`:''))) return;
+  obra().items.push(...nuevos); save(); render(); toast(`Importados ${nuevos.length} elementos`);
+}
+
+/* Copia de seguridad: todas las obras con sus fotos */
+async function copiaSeguridad(){
+  const obras=[];
+  for(const o of obrasOrdenadas()) obras.push({...o,imagen:await imgGet(o.id)});
+  const d=new Date(), f=d.toISOString().slice(0,10);
+  descargar(new Blob([JSON.stringify({app:'cubicador',version:2,fecha:d.toISOString(),obras})],{type:'application/json'}),`cubicador-copia-${f}.json`);
+  toast('Copia descargada: guárdela en el correo o en Drive');
+}
+async function restaurar(data){
+  if(!data||data.app!=='cubicador'||!Array.isArray(data.obras)){ toast('Ese archivo no es una copia del cubicador'); return; }
+  if(!confirm(`La copia tiene ${data.obras.length} obras. Se añadirán a las que ya tiene (no se borra nada).`)) return;
+  const nombres=new Set(Object.values(db.obras).map(o=>o.nombre)); let primera=null;
+  for(const src of data.obras){
+    const o=crearObra(nombres.has(src.nombre)?src.nombre+' (restaurada)':src.nombre);
+    o.items=(src.items||[]).filter(it=>TIPOS[it.tipo]).map(it=>({id:uid(),tipo:it.tipo,ref:it.ref||'',raw:{...it.raw},uds:String(it.uds??'1')}));
+    o.escala=src.escala||null; if(src.imagen) await imgSet(o.id,src.imagen);
+    primera=primera||o.id;
+  }
+  save(); if(primera) cambiarObra(primera); toast('Copia restaurada');
+}
+
+/* =================== UTILIDADES =================== */
+let tt; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),2600); }
+
+(async()=>{ await initDB(); initTipos(); pintarCampos(); render(); cargarFoto(); })();
+</script>
+</body>
+</html>
